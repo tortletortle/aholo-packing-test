@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Packing Test — 3D 装箱小样</title>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="c"></canvas>
+      <aside id="panel">
+        <h1>装箱小样</h1>
+        <p class="hint" id="key-help">
+          点击列表选物品 · WASD/方向键移动一格 · R 旋转90° · Enter 确认 · Esc 取消<br />
+          已放物品可再点列表取出重摆 · 预览确认后才占格
+        </p>
+        <h2>物品</h2>
+        <ul id="item-list"></ul>
+        <h2>状态</h2>
+        <div id="status" role="status" aria-live="polite"></div>
+        <h2>已验证示例</h2>
+        <button type="button" id="btn-demo">载入两层示例布局</button>
+      </aside>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
