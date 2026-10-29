@@ -1,0 +1,10 @@
+{
+  "prompt": "一本合着的厚皮革封面西幻魔法书，深棕色皮革，金属包角，书脊有烫金花纹，平放在桌面上，单独物体，无背景",
+  "style": "fantasy",
+  "version": "G1-Turbo",
+  "faceCount": 20000,
+  "outputFormat": ["glb"],
+  "enablePbr": true,
+  "aiPredictSize": true,
+  "wait": false
+}

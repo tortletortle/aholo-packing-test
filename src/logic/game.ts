@@ -44,6 +44,9 @@ export function createInitialState(): GameState {
       { instanceId: nid('bar'), shapeId: 'bar', placed: false },
       { instanceId: nid('block'), shapeId: 'block', placed: false },
       { instanceId: nid('L'), shapeId: 'L', placed: false },
+      // real Aholo asset test
+      { instanceId: nid('book'), shapeId: 'book', placed: false },
+      { instanceId: nid('book'), shapeId: 'book', placed: false },
     ],
     placements: [],
     preview: null,

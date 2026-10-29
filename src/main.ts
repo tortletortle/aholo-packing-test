@@ -3,17 +3,56 @@ import { createInitialState, type GameState } from './logic/game'
 import { bindKeyboard } from './input/keyboard'
 import { mountPanel } from './ui/panel'
 import { PackingScene } from './view/scene'
+import { loadModels } from './view/models'
 
 const canvas = document.querySelector<HTMLCanvasElement>('#c')!
 let state: GameState = createInitialState()
 
 const view = new PackingScene(canvas)
+
+// --- real model check controls ---
+const btnCells = document.querySelector<HTMLButtonElement>('#btn-cells')!
+const btnFit = document.querySelector<HTMLButtonElement>('#btn-fit')!
+const modelStatus = document.querySelector<HTMLDivElement>('#model-status')!
+let loadText = ''
+
+function refreshModelUi() {
+  btnCells.textContent = `已放物品：${view.options.showCells ? '隐藏' : '显示'}占格线（C）`
+  btnFit.textContent = `贴合：${view.options.fit === 'fill' ? '拉伸填满格子' : '等比缩放（不变形）'}（F）`
+  const d = view.lastDistortion
+  const distortion = d === null ? '' : `\n当前变形：最大轴向缩放比 ${d.toFixed(2)}（1.00 = 不变形）`
+  modelStatus.textContent = loadText + distortion
+}
+function toggleCells() {
+  view.options.showCells = !view.options.showCells
+  view.sync(state)
+  refreshModelUi()
+}
+function toggleFit() {
+  view.options.fit = view.options.fit === 'fill' ? 'contain' : 'fill'
+  view.sync(state)
+  refreshModelUi()
+}
+btnCells.addEventListener('click', toggleCells)
+btnFit.addEventListener('click', toggleFit)
+window.addEventListener('keydown', (e) => {
+  if (e.repeat) return
+  if (e.key === 'c' || e.key === 'C') toggleCells()
+  if (e.key === 'f' || e.key === 'F') toggleFit()
+})
+
+void loadModels((s) => {
+  loadText = s.text
+  view.sync(state)
+  refreshModelUi()
+})
 const panel = mountPanel(
   () => state,
   (s) => {
     state = s
     panel.refresh()
     view.sync(state)
+    refreshModelUi()
   },
 )
 
@@ -23,6 +62,7 @@ bindKeyboard(
     state = s
     panel.refresh()
     view.sync(state)
+    refreshModelUi()
   },
 )
 

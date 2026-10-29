@@ -1,8 +1,16 @@
 import * as THREE from 'three'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import type { GameState } from '../logic/game'
 import { previewOrigin } from '../logic/game'
 import { occupiedCells } from '../logic/shapes'
-import { cellKey, type Cell } from '../logic/types'
+import { cellKey, type Cell, type ShapeId } from '../logic/types'
+import { getTemplate, placeModel, type FitMode } from './models'
+
+export type ViewOptions = {
+  /** Draw cell outlines over placed models */
+  showCells: boolean
+  fit: FitMode
+}
 
 const CELL = 1
 const COLORS: Record<string, number> = {
@@ -26,12 +34,21 @@ export class PackingScene {
   private readonly root = new THREE.Group()
   private readonly content = new THREE.Group()
   private readonly overlays = new THREE.Group()
+  readonly options: ViewOptions = { showCells: false, fit: 'fill' }
+  /** Max axis-scale ratio of the last drawn model (1 = no distortion) */
+  lastDistortion: number | null = null
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.scene.background = new THREE.Color(0x1a1d24)
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.55))
+    // Image-based lighting so PBR (metal/roughness) assets don't render flat or black
+    const pmrem = new THREE.PMREMGenerator(this.renderer)
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+    this.scene.environmentIntensity = 0.6
+    pmrem.dispose()
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.35))
     const dir = new THREE.DirectionalLight(0xffffff, 0.85)
     dir.position.set(8, 14, 10)
     this.scene.add(dir)
@@ -65,13 +82,18 @@ export class PackingScene {
       // While re-editing, still show original solid until confirm — preview drawn separately
       if (state.preview?.restore?.id === p.id) continue
       const cells = occupiedCells(p.shapeId, p.origin, p.rot)
-      this.drawCells(cells, COLORS[p.shapeId] ?? 0xffffff, 0.92, this.content)
+      if (this.drawModel(p.shapeId, cells, p.rot, this.content)) {
+        if (this.options.showCells) this.drawOutlines(cells, 0xffd27a)
+      } else {
+        this.drawCells(cells, COLORS[p.shapeId] ?? 0xffffff, 0.92, this.content)
+      }
     }
 
     if (state.preview && state.lastResult) {
       const origin = previewOrigin(state)
       if (origin) {
         const cells = occupiedCells(state.preview.shapeId, origin, state.preview.rot)
+        this.drawModel(state.preview.shapeId, cells, state.preview.rot, this.overlays)
         const ok = state.lastResult.ok
         this.drawCells(cells, ok ? COLORS.previewOk : COLORS.previewBad, 0.35, this.overlays)
         this.drawOutlines(cells, ok ? 0xaaffdd : 0xff8899)
@@ -111,6 +133,22 @@ export class PackingScene {
     }
   }
 
+  /** Draw the shape's real model fitted to its occupied cells. Returns false if no model is loaded. */
+  private drawModel(shapeId: ShapeId, cells: Cell[], rot: number, parent: THREE.Group): boolean {
+    const tpl = getTemplate(shapeId)
+    if (!tpl) return false
+    const min = new THREE.Vector3(Infinity, Infinity, Infinity)
+    const max = new THREE.Vector3(-Infinity, -Infinity, -Infinity)
+    for (const c of cells) {
+      min.min(new THREE.Vector3(c.x * CELL, c.y * CELL, c.z * CELL))
+      max.max(new THREE.Vector3((c.x + 1) * CELL, (c.y + 1) * CELL, (c.z + 1) * CELL))
+    }
+    const { object, distortion } = placeModel(tpl, min, max, rot, this.options.fit)
+    this.lastDistortion = distortion
+    parent.add(object)
+    return true
+  }
+
   private drawCells(cells: Cell[], color: number, opacity: number, parent: THREE.Group) {
     const geo = new THREE.BoxGeometry(CELL * 0.92, CELL * 0.92, CELL * 0.92)
     const mat = new THREE.MeshStandardMaterial({
@@ -143,6 +181,7 @@ export class PackingScene {
       const ch = g.children.pop()!
       g.remove(ch)
       ch.traverse((o) => {
+        if (o.userData.sharedAsset) return // geometry/material belong to the loaded template
         const m = o as THREE.Mesh
         if (m.geometry) m.geometry.dispose()
         const mat = m.material
