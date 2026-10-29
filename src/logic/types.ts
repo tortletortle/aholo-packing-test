@@ -1,7 +1,7 @@
 /** Integer grid cell. Y is vertical layer (0 = bottom). */
 export type Cell = { readonly x: number; readonly y: number; readonly z: number }
 
-export type ShapeId = 'bar' | 'block' | 'L' | 'book'
+export type ShapeId = 'bar' | 'block' | 'L' | 'book' | 'potion' | 'dragon' | 'mug'
 
 export type RotTurns = 0 | 1 | 2 | 3
 

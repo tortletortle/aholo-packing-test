@@ -190,3 +190,12 @@ describe('preview stays inside the box', () => {
     }
   })
 })
+
+describe('multi-model showcase', () => {
+  it('loads a valid layout with a mug stacked on the book', async () => {
+    const { loadShowcaseLayout } = await import('./game')
+    const s = loadShowcaseLayout()
+    expect(s.placements).toHaveLength(6)
+    expect(s.placements.some((p) => p.shapeId === 'mug' && p.origin.y === 1)).toBe(true)
+  })
+})

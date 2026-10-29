@@ -1,0 +1,10 @@
+{
+  "prompt": "一个西幻风格的魔药瓶，圆肚玻璃瓶身装着发光的紫色药水，细长瓶颈，软木塞，瓶颈系着皮绳和小标签，直立，单独物体，无背景",
+  "style": "fantasy",
+  "version": "G1-Turbo",
+  "faceCount": 20000,
+  "outputFormat": ["glb"],
+  "enablePbr": true,
+  "aiPredictSize": true,
+  "wait": false
+}

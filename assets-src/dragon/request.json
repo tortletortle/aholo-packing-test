@@ -1,0 +1,10 @@
+{
+  "prompt": "一个西幻风格的小型龙形雕像摆件，盘踞在圆形石质底座上，青铜质感，眼睛镶嵌发光的绿宝石，翅膀收拢，紧凑造型，单独物体，无背景",
+  "style": "fantasy",
+  "version": "G1-Turbo",
+  "faceCount": 20000,
+  "outputFormat": ["glb"],
+  "enablePbr": true,
+  "aiPredictSize": true,
+  "wait": false
+}

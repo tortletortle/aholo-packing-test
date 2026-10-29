@@ -1,9 +1,9 @@
 import './styles.css'
-import { createInitialState, type GameState } from './logic/game'
+import { createInitialState, loadShowcaseLayout, type GameState } from './logic/game'
 import { bindKeyboard } from './input/keyboard'
 import { mountPanel } from './ui/panel'
 import { PackingScene } from './view/scene'
-import { loadModels } from './view/models'
+import { FIT_LABELS, loadModels, type FitMode } from './view/models'
 
 const canvas = document.querySelector<HTMLCanvasElement>('#c')!
 let state: GameState = createInitialState()
@@ -18,7 +18,7 @@ let loadText = ''
 
 function refreshModelUi() {
   btnCells.textContent = `已放物品：${view.options.showCells ? '隐藏' : '显示'}占格线（C）`
-  btnFit.textContent = `贴合：${view.options.fit === 'fill' ? '拉伸填满格子' : '等比缩放（不变形）'}（F）`
+  btnFit.textContent = `贴合：${FIT_LABELS[view.options.fit]}（F）`
   const d = view.lastDistortion
   const distortion = d === null ? '' : `\n当前变形：最大轴向缩放比 ${d.toFixed(2)}（1.00 = 不变形）`
   modelStatus.textContent = loadText + distortion
@@ -28,11 +28,18 @@ function toggleCells() {
   view.sync(state)
   refreshModelUi()
 }
+const FIT_ORDER: FitMode[] = ['real', 'fill', 'contain']
 function toggleFit() {
-  view.options.fit = view.options.fit === 'fill' ? 'contain' : 'fill'
+  view.options.fit = FIT_ORDER[(FIT_ORDER.indexOf(view.options.fit) + 1) % FIT_ORDER.length]
   view.sync(state)
   refreshModelUi()
 }
+document.querySelector<HTMLButtonElement>('#btn-showcase')!.addEventListener('click', () => {
+  state = loadShowcaseLayout()
+  panel.refresh()
+  view.sync(state)
+  refreshModelUi()
+})
 const btnView = document.querySelector<HTMLButtonElement>('#btn-view')!
 function nextView() {
   btnView.textContent = `视角：${view.nextView()}（V 切换）`

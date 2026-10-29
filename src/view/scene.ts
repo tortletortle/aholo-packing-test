@@ -41,7 +41,7 @@ export class PackingScene {
   private readonly root = new THREE.Group()
   private readonly content = new THREE.Group()
   private readonly overlays = new THREE.Group()
-  readonly options: ViewOptions = { showCells: false, fit: 'fill' }
+  readonly options: ViewOptions = { showCells: false, fit: 'real' }
   /** Max axis-scale ratio of the last drawn model (1 = no distortion) */
   lastDistortion: number | null = null
 
@@ -121,14 +121,19 @@ export class PackingScene {
     // Floor grid only while placing (or when cell lines are switched on)
     this.drawBin(state.bin.sx, state.bin.sy, state.bin.sz, state.preview !== null || this.options.showCells)
 
-    for (const p of state.placements) {
+    // Visual top surface per (x,z) column, so stacked models sit on the real top of the model below
+    // instead of floating at the cell boundary. Occupancy rules are unchanged.
+    this.surface.clear()
+    const ordered = [...state.placements].sort((a, b) => a.origin.y - b.origin.y)
+    for (const p of ordered) {
       // While re-editing, still show original solid until confirm — preview drawn separately
       if (state.preview?.restore?.id === p.id) continue
       const cells = occupiedCells(p.shapeId, p.origin, p.rot)
-      if (this.drawModel(p.shapeId, cells, p.rot, this.content)) {
+      if (this.drawModel(p.shapeId, cells, p.rot, this.content, true)) {
         if (this.options.showCells) this.drawOutlines(cells, 0xffd27a)
       } else {
         this.drawCells(cells, COLORS[p.shapeId] ?? 0xffffff, 0.92, this.content)
+        for (const c of cells) this.raiseSurface(c.x, c.z, (c.y + 0.96) * CELL)
       }
     }
 
@@ -184,7 +189,14 @@ export class PackingScene {
   }
 
   /** Draw the shape's real model fitted to its occupied cells. Returns false if no model is loaded. */
-  private drawModel(shapeId: ShapeId, cells: Cell[], rot: number, parent: THREE.Group): boolean {
+  private readonly surface = new Map<string, number>()
+
+  private raiseSurface(x: number, z: number, y: number) {
+    const k = `${x},${z}`
+    this.surface.set(k, Math.max(this.surface.get(k) ?? 0, y))
+  }
+
+  private drawModel(shapeId: ShapeId, cells: Cell[], rot: number, parent: THREE.Group, record = false): boolean {
     const tpl = getTemplate(shapeId)
     if (!tpl) return false
     const min = new THREE.Vector3(Infinity, Infinity, Infinity)
@@ -193,7 +205,11 @@ export class PackingScene {
       min.min(new THREE.Vector3(c.x * CELL, c.y * CELL, c.z * CELL))
       max.max(new THREE.Vector3((c.x + 1) * CELL, (c.y + 1) * CELL, (c.z + 1) * CELL))
     }
-    const { object, distortion } = placeModel(tpl, min, max, rot, this.options.fit)
+    // Rest on the highest visual surface under the footprint (0 on the box floor)
+    let baseY = 0
+    if (min.y > 0) for (const c of cells) baseY = Math.max(baseY, this.surface.get(`${c.x},${c.z}`) ?? 0)
+    const { object, distortion, height } = placeModel(tpl, min, max, rot, this.options.fit, 0.92, baseY)
+    if (record) for (const c of cells) this.raiseSurface(c.x, c.z, height)
     this.lastDistortion = distortion
     parent.add(object)
     return true

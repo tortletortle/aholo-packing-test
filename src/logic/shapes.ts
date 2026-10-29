@@ -30,6 +30,24 @@ export const SHAPE_CELLS: Record<ShapeId, readonly Cell[]> = {
     { x: 0, y: 0, z: 2 },
     { x: 1, y: 0, z: 2 },
   ],
+  // Potion 0.095 × 0.16 × 0.093 m → one column, 2 tall (body + neck)
+  potion: [
+    { x: 0, y: 0, z: 0 },
+    { x: 0, y: 1, z: 0 },
+  ],
+  // Dragon statue 0.25 × 0.18 × 0.25 m → 2 × 2 × 2
+  dragon: [
+    { x: 0, y: 0, z: 0 },
+    { x: 1, y: 0, z: 0 },
+    { x: 0, y: 0, z: 1 },
+    { x: 1, y: 0, z: 1 },
+    { x: 0, y: 1, z: 0 },
+    { x: 1, y: 1, z: 0 },
+    { x: 0, y: 1, z: 1 },
+    { x: 1, y: 1, z: 1 },
+  ],
+  // Mug 0.135 × 0.13 × 0.098 m → single cell
+  mug: [{ x: 0, y: 0, z: 0 }],
 }
 
 export const SHAPE_LABELS: Record<ShapeId, string> = {
@@ -37,6 +55,9 @@ export const SHAPE_LABELS: Record<ShapeId, string> = {
   block: '块状 (2×2)',
   L: 'L 形',
   book: '魔法书 (2×3，Aholo 模型)',
+  potion: '魔药瓶 (1×1 高2，Aholo 模型)',
+  dragon: '龙形雕像 (2×2 高2，Aholo 模型)',
+  mug: '木酒杯 (1×1，Aholo 模型)',
 }
 
 /** 90° CW around +Y looking down: (x,z) → (z, -x) */

@@ -5,10 +5,26 @@ import type { ShapeId } from '../logic/types'
 /** Visual models for shapes. Occupancy stays in SHAPE_CELLS; the model only follows it. */
 export const MODEL_URLS: Partial<Record<ShapeId, string>> = {
   book: '/models/book.glb',
+  potion: '/models/potion.glb',
+  dragon: '/models/dragon.glb',
+  mug: '/models/mug.glb',
 }
 
-/** fill = scale each axis to the cell block (may distort); contain = uniform scale, no distortion */
-export type FitMode = 'fill' | 'contain'
+/** Real-world size of one grid cell, used by the 'real' fit mode. */
+export const CELL_METERS = 0.14
+
+/**
+ * real    = same metres→cells scale for every model, so relative sizes match Lux3D's predicted sizes
+ *           (shrunk only if it would poke out of its cells)
+ * fill    = scale each axis to the cell block (may distort)
+ * contain = uniform scale to the largest size that fits the cells
+ */
+export type FitMode = 'real' | 'fill' | 'contain'
+export const FIT_LABELS: Record<FitMode, string> = {
+  real: '真实比例',
+  fill: '拉伸填满格子',
+  contain: '等比放大到格子',
+}
 
 export type ModelTemplate = {
   /** Model centred at origin, original size */
@@ -68,7 +84,9 @@ export function placeModel(
   rot: number,
   fit: FitMode,
   pad = 0.92,
-): { object: THREE.Object3D; distortion: number } {
+  /** World Y the model's bottom rests on; defaults to the cell floor */
+  baseY?: number,
+): { object: THREE.Object3D; distortion: number; height: number } {
   const inst = tpl.object.clone(true)
   inst.traverse((o) => {
     o.userData.sharedAsset = true
@@ -88,7 +106,8 @@ export function placeModel(
   if (fit === 'fill') {
     scale = new THREE.Vector3(sx, sy, sz)
   } else {
-    const s = Math.min(sx, sy, sz)
+    const containS = Math.min(sx, sy, sz)
+    const s = fit === 'real' ? Math.min(1 / CELL_METERS, containS) : containS
     scale = new THREE.Vector3(s, s, s)
   }
   const distortion = Math.max(scale.x, scale.y, scale.z) / Math.min(scale.x, scale.y, scale.z)
@@ -99,8 +118,9 @@ export function placeModel(
   holder.add(inst)
   holder.rotation.y = (rot * Math.PI) / 2
   const height = tpl.size.y * scale.y
-  holder.position.set((boxMin.x + boxMax.x) / 2, boxMin.y + 0.02 + height / 2, (boxMin.z + boxMax.z) / 2)
-  return { object: holder, distortion }
+  const bottom = (baseY ?? boxMin.y) + 0.02
+  holder.position.set((boxMin.x + boxMax.x) / 2, bottom + height / 2, (boxMin.z + boxMax.z) / 2)
+  return { object: holder, distortion, height: bottom + height }
 }
 
 function fmt(v: THREE.Vector3) {

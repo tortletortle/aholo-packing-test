@@ -47,6 +47,11 @@ export function createInitialState(): GameState {
       // real Aholo asset test
       { instanceId: nid('book'), shapeId: 'book', placed: false },
       { instanceId: nid('book'), shapeId: 'book', placed: false },
+      { instanceId: nid('dragon'), shapeId: 'dragon', placed: false },
+      { instanceId: nid('potion'), shapeId: 'potion', placed: false },
+      { instanceId: nid('potion'), shapeId: 'potion', placed: false },
+      { instanceId: nid('mug'), shapeId: 'mug', placed: false },
+      { instanceId: nid('mug'), shapeId: 'mug', placed: false },
     ],
     placements: [],
     preview: null,
@@ -268,5 +273,33 @@ export function loadDemoLayout(): GameState {
     preview: null,
     lastResult: null,
     status: '已载入两层示例：底层长条+块状，上层 L（完整支撑）',
+  }
+}
+
+/** All four Aholo models in one box, including a mug stacked on the book. Validated in order. */
+export function loadShowcaseLayout(): GameState {
+  seq = 1
+  const state = createInitialState()
+  const take = (shapeId: ShapeId, n = 0) => state.inventory.filter((s) => s.shapeId === shapeId)[n].instanceId
+  const layout: Placement[] = [
+    { id: take('book'), shapeId: 'book', origin: { x: 0, y: 0, z: 0 }, rot: 0 },
+    { id: take('dragon'), shapeId: 'dragon', origin: { x: 2, y: 0, z: 0 }, rot: 0 },
+    { id: take('potion', 0), shapeId: 'potion', origin: { x: 4, y: 0, z: 0 }, rot: 0 },
+    { id: take('potion', 1), shapeId: 'potion', origin: { x: 5, y: 0, z: 0 }, rot: 0 },
+    { id: take('mug', 0), shapeId: 'mug', origin: { x: 4, y: 0, z: 1 }, rot: 1 },
+    { id: take('mug', 1), shapeId: 'mug', origin: { x: 0, y: 1, z: 1 }, rot: 0 }, // on top of the book
+  ]
+  const occ = buildOccupancy([])
+  for (const p of layout) {
+    const r = validatePlacement(p.shapeId, p.origin, p.rot, state.bin, occ)
+    if (!r.ok) throw new Error(`showcase invalid ${p.id}: ${r.message}`)
+    for (const c of occupiedCells(p.shapeId, p.origin, p.rot)) occ.set(`${c.x},${c.y},${c.z}`, p.id)
+  }
+  const ids = new Set(layout.map((p) => p.id))
+  return {
+    ...state,
+    placements: layout,
+    inventory: state.inventory.map((s) => (ids.has(s.instanceId) ? { ...s, placed: true } : s)),
+    status: '已载入四件模型示例：书、龙形雕像、两瓶魔药、两只酒杯（一只叠在书上）',
   }
 }
