@@ -81,7 +81,7 @@ export function mountFlowPanel(getFlow: () => FlowState, actions: FlowActions): 
         ${other.map((id) => `<button type="button" class="flow-btn subtle" data-act="switch" data-box="${id}">换成${esc(BOXES[id].label)}</button>`).join('')}
         <button type="button" class="flow-btn primary" data-act="seal" ${check.ok ? '' : 'disabled'}>封箱</button>
         ${check.ok ? '' : `<p class="hint">${esc(check.reason)}</p>`}
-        <p class="hint">封箱时会检查箱内空隙：空格越多，运输中越容易晃动破损。</p>`
+        <p class="hint">封箱时会检查箱内空隙：空格越多，运输中越容易晃动破损。封箱后可以买填充物降低风险。</p>`
       return
     }
 
@@ -96,18 +96,18 @@ export function mountFlowPanel(getFlow: () => FlowState, actions: FlowActions): 
         return `<button type="button" class="flow-btn ${sel ? 'selected' : ''}" data-act="filler" data-filler="${id}" ${affordable ? '' : 'disabled'}>
           ${sel ? '● ' : '○ '}${esc(f.label)} · ${cost} 金币 · 风险 ${pct(riskWith(insp, id))}</button>`
       }).join('')
-      root.innerHTML = `${card}
+      root.innerHTML = `
+        <div class="order-line">订单 ${flow.orderIndex + 1} · ${esc(order.customer)} · 已封箱</div>
         <div class="inspect">
           <div class="order-head">封箱检查</div>
-          <div class="row"><span>箱内空格</span><span>${insp.empty} / ${insp.volume}</span></div>
-          <div class="row"><span>空隙率</span><span>${pct(insp.emptyRatio)}</span></div>
-          <div class="row"><span>未加填充的破损风险</span><span>${pct(insp.baseRisk)}</span></div>
+          <div class="row"><span>箱内空格</span><span>${insp.empty} / ${insp.volume}（空隙率 ${pct(insp.emptyRatio)}）</span></div>
           <div class="row total"><span>当前破损风险</span><span class="${risk > 0.15 ? 'warn' : ''}">${pct(risk)}</span></div>
-          <div class="row"><span>破损赔偿</span><span>${order.compensation} 金币</span></div>
+          <div class="row"><span>破损要赔</span><span>${order.compensation} 金币</span></div>
         </div>
-        <h2>填充物（按空格数计价）</h2>
+        <h2 class="filler-title">选择填充物（按空格数计价）</h2>
         ${insp.empty === 0 ? '<p class="hint">箱子装满了，没有空隙，不需要填充。</p>' : opts}
         <button type="button" class="flow-btn primary" data-act="ship">寄出</button>`
+      root.closest('#panel')?.scrollTo({ top: 0 })
       return
     }
 

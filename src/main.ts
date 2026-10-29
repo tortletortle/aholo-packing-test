@@ -99,7 +99,10 @@ function sceneExtras(): SceneExtras {
   }
   return {}
 }
-bindKeyboard(packing, setPacking)
+bindKeyboard(packing, setPacking, () => view.screenAxes())
+view.enableOrbit(canvas)
+// Dev-only handle for automated checks (camera position, WASD mapping)
+if (import.meta.env.DEV) (window as unknown as { __view: PackingScene }).__view = view
 
 function render() {
   panel.refresh()

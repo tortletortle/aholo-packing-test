@@ -45,16 +45,22 @@ function mapKey(key: string): KeyAction | null {
   }
 }
 
-function applyAction(state: GameState, action: KeyAction): GameState {
+export type Step = { dx: number; dz: number }
+/** Grid step for "screen up" and "screen right"; default matches the camera looking from +Z. */
+export type MoveBasis = () => { forward: Step; right: Step }
+const DEFAULT_BASIS: MoveBasis = () => ({ forward: { dx: 0, dz: -1 }, right: { dx: 1, dz: 0 } })
+
+function applyAction(state: GameState, action: KeyAction, basis: MoveBasis): GameState {
+  const { forward, right } = basis()
   switch (action) {
     case 'left':
-      return movePreview(state, -1, 0)
+      return movePreview(state, -right.dx, -right.dz)
     case 'right':
-      return movePreview(state, 1, 0)
+      return movePreview(state, right.dx, right.dz)
     case 'forward':
-      return movePreview(state, 0, -1) // -Z into the box
+      return movePreview(state, forward.dx, forward.dz)
     case 'back':
-      return movePreview(state, 0, 1)
+      return movePreview(state, -forward.dx, -forward.dz)
     case 'rotate':
       return rotatePreview(state)
     case 'confirm':
@@ -68,7 +74,11 @@ export type KeyboardController = {
   dispose: () => void
 }
 
-export function bindKeyboard(getState: () => GameState, setState: (s: GameState) => void): KeyboardController {
+export function bindKeyboard(
+  getState: () => GameState,
+  setState: (s: GameState) => void,
+  basis: MoveBasis = DEFAULT_BASIS,
+): KeyboardController {
   let holdTimer: number | null = null
   let repeatTimer: number | null = null
   let heldAction: KeyAction | null = null
@@ -82,7 +92,7 @@ export function bindKeyboard(getState: () => GameState, setState: (s: GameState)
   }
 
   const fire = (action: KeyAction) => {
-    setState(applyAction(getState(), action))
+    setState(applyAction(getState(), action, basis))
   }
 
   const onDown = (e: KeyboardEvent) => {

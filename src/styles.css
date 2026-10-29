@@ -232,6 +232,16 @@ body {
   color: #ff9a7a;
 }
 
+.order-line {
+  font-size: 0.85rem;
+  color: #d9c79f;
+  margin-bottom: 8px;
+}
+
+.filler-title {
+  color: #f0c060 !important;
+}
+
 .flow-btn.selected {
   border-color: #66ffcc;
   box-shadow: 0 0 0 1px #66ffcc55;

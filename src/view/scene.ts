@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import type { GameState } from '../logic/game'
 import { previewOrigin } from '../logic/game'
 import { occupiedCells } from '../logic/shapes'
@@ -85,13 +86,31 @@ export class PackingScene {
     this.renderer.setSize(width, height, false)
     this.camera.aspect = width / height
     this.camera.updateProjectionMatrix()
-    this.frameBin()
+    this.frameBin(true)
   }
 
   private bin = { sx: 6, sy: 2, sz: 4 }
   viewIndex = 0
+  private controls: OrbitControls | null = null
 
-  /** Cycle camera preset. All presets look from the +Z side so WASD keeps the same screen direction. */
+  /**
+   * Mouse camera: left-drag to orbit, wheel to zoom. Pan is off so the box stays centred.
+   * The camera cannot go below the table.
+   */
+  enableOrbit(dom: HTMLElement) {
+    const c = new OrbitControls(this.camera, dom)
+    c.enableDamping = true
+    c.dampingFactor = 0.12
+    c.enablePan = false
+    c.minPolarAngle = THREE.MathUtils.degToRad(5)
+    c.maxPolarAngle = THREE.MathUtils.degToRad(80)
+    c.minDistance = 2
+    c.maxDistance = 40
+    this.controls = c
+    this.frameBin()
+  }
+
+  /** Jump to the next preset view. */
   nextView(): string {
     this.viewIndex = (this.viewIndex + 1) % VIEWS.length
     this.frameBin()
@@ -102,14 +121,34 @@ export class PackingScene {
     return VIEWS[this.viewIndex].label
   }
 
-  /** Point the camera at the box centre and pull back just enough to fit the whole box. */
-  private frameBin() {
+  /**
+   * Grid directions for "screen up" and "screen right", snapped to the nearest box axis.
+   * Used so WASD follows the camera after the player rotates the view.
+   */
+  screenAxes(): { forward: { dx: number; dz: number }; right: { dx: number; dz: number } } {
+    const target = this.controls?.target ?? new THREE.Vector3()
+    const fx = target.x - this.camera.position.x
+    const fz = target.z - this.camera.position.z
+    const forward = Math.abs(fx) > Math.abs(fz) ? { dx: Math.sign(fx), dz: 0 } : { dx: 0, dz: Math.sign(fz) || -1 }
+    return { forward, right: { dx: -forward.dz, dz: forward.dx } }
+  }
+
+  /**
+   * Point the camera at the box centre and pull back just enough to fit the whole box.
+   * keepDirection: refit distance but keep the player's current viewing angle (resize, box change).
+   */
+  private frameBin(keepDirection = false) {
     const { sx, sy, sz } = this.bin
     const v = VIEWS[this.viewIndex]
     const target = new THREE.Vector3((sx * CELL) / 2, (sy * CELL) / 3, (sz * CELL) / 2)
-    const el = THREE.MathUtils.degToRad(v.elevation)
-    const az = THREE.MathUtils.degToRad(v.azimuth)
-    const dir = new THREE.Vector3(Math.cos(el) * Math.sin(az), Math.sin(el), Math.cos(el) * Math.cos(az))
+    let dir: THREE.Vector3
+    if (keepDirection && this.controls) {
+      dir = this.camera.position.clone().sub(this.controls.target).normalize()
+    } else {
+      const el = THREE.MathUtils.degToRad(v.elevation)
+      const az = THREE.MathUtils.degToRad(v.azimuth)
+      dir = new THREE.Vector3(Math.cos(el) * Math.sin(az), Math.sin(el), Math.cos(el) * Math.cos(az))
+    }
     const corners: THREE.Vector3[] = []
     for (const x of [0, sx]) for (const y of [0, sy]) for (const z of [0, sz]) corners.push(new THREE.Vector3(x, y, z).multiplyScalar(CELL))
     const place = (d: number) => {
@@ -135,9 +174,14 @@ export class PackingScene {
       else lo = mid
     }
     place(hi)
+    if (this.controls) {
+      this.controls.target.copy(target)
+      this.controls.update()
+    }
   }
 
   render() {
+    this.controls?.update()
     this.renderer.render(this.scene, this.camera)
   }
 
@@ -149,7 +193,7 @@ export class PackingScene {
     this.clearGroup(this.overlays)
     if (state.bin.sx !== this.bin.sx || state.bin.sy !== this.bin.sy || state.bin.sz !== this.bin.sz) {
       this.bin = { ...state.bin }
-      this.frameBin()
+      this.frameBin(true)
     }
     // Floor grid only while placing (or when cell lines are switched on)
     this.drawBin(state.bin.sx, state.bin.sy, state.bin.sz, state.preview !== null || this.options.showCells)
