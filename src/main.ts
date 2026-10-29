@@ -1,7 +1,10 @@
 import './styles.css'
 import { BOXES } from './config/economy'
 import { createInitialState, createPackingState, loadShowcaseLayout, type GameState } from './logic/game'
-import { createFlow, seal, startPacking, switchBox, withPacking, type FlowState } from './logic/flow'
+import { chooseFiller, createFlow, seal, ship, startPacking, switchBox, withPacking, type FlowState } from './logic/flow'
+import { FILLERS } from './config/economy'
+import { emptyCells } from './logic/filling'
+import type { SceneExtras } from './view/scene'
 import { bindKeyboard } from './input/keyboard'
 import { mountPanel } from './ui/panel'
 import { mountFlowPanel } from './ui/flowPanel'
@@ -82,8 +85,20 @@ const flowPanel = mountFlowPanel(() => flow, {
   startPacking: (boxId) => setFlow(startPacking(flow, boxId)),
   switchBox: (boxId) => setFlow(switchBox(flow, boxId)),
   seal: () => setFlow(seal(flow)),
+  chooseFiller: (id) => setFlow(chooseFiller(flow, id)),
+  ship: () => setFlow(ship(flow)),
   restart: () => setFlow(createFlow()),
 })
+
+/** Lid after shipping; filler in empty cells while sealed */
+function sceneExtras(): SceneExtras {
+  if (SANDBOX) return {}
+  if (flow.phase === 'settled') return { lid: true }
+  if (flow.phase === 'sealed' && flow.packing && flow.fillerId !== 'none') {
+    return { fillCells: emptyCells(flow.packing), fillColor: FILLERS[flow.fillerId].color }
+  }
+  return {}
+}
 bindKeyboard(packing, setPacking)
 
 function render() {
@@ -94,7 +109,7 @@ function render() {
   } else {
     flowPanel.refresh()
   }
-  view.sync(packing())
+  view.sync(packing(), sceneExtras())
   refreshModelUi()
 }
 

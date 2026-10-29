@@ -205,6 +205,53 @@ body {
   cursor: not-allowed;
 }
 
+.inspect {
+  padding: 12px;
+  border-radius: 8px;
+  background: #1f2633;
+  border: 1px solid #3a4a66;
+  margin-bottom: 12px;
+}
+
+.inspect .row,
+.receipt .row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  padding: 2px 0;
+}
+
+.inspect .row.total {
+  border-top: 1px solid #3a4a66;
+  margin-top: 4px;
+  padding-top: 6px;
+  font-weight: 600;
+}
+
+.warn {
+  color: #ff9a7a;
+}
+
+.flow-btn.selected {
+  border-color: #66ffcc;
+  box-shadow: 0 0 0 1px #66ffcc55;
+}
+
+.result {
+  padding: 6px 8px;
+  border-radius: 6px;
+  margin: 6px 0 8px;
+  font-size: 0.9rem;
+}
+
+.result.good {
+  background: #1f3a2c;
+}
+
+.result.bad {
+  background: #4a2228;
+}
+
 .receipt .row {
   display: flex;
   justify-content: space-between;

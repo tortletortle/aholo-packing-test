@@ -8,6 +8,8 @@ export type OrderDef = {
   readonly items: readonly ShapeId[]
   /** Amount the customer pays for the job */
   readonly payment: number
+  /** Paid to the customer if the goods break in transit */
+  readonly compensation: number
 }
 
 /**
@@ -22,5 +24,6 @@ export const ORDERS: readonly OrderDef[] = [
     note: '一本魔法书和三只酒杯，是给馆长的生日礼物。东西不贵重，但别弄丢了。',
     items: ['book', 'mug', 'mug', 'mug'],
     payment: 30,
+    compensation: 20,
   },
 ]

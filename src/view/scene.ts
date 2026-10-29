@@ -5,6 +5,15 @@ import { previewOrigin } from '../logic/game'
 import { occupiedCells } from '../logic/shapes'
 import { cellKey, type Cell, type ShapeId } from '../logic/types'
 import { getTemplate, placeModel, type FitMode } from './models'
+import { buildCrate } from './crate'
+
+export type SceneExtras = {
+  /** Draw the crate lid (shipped) */
+  lid?: boolean
+  /** Empty cells to fill with packing material, and its colour */
+  fillCells?: Cell[]
+  fillColor?: number
+}
 
 export type ViewOptions = {
   /** Draw cell outlines over placed models */
@@ -30,6 +39,10 @@ const VIEWS = [
   { label: '正俯视', elevation: 88, azimuth: 0, fill: 0.8 },
   { label: '低角度', elevation: 28, azimuth: 18, fill: 0.8 },
 ] as const
+
+// Filler lumps share one geometry and one material per colour (never disposed, reused every redraw)
+const FILLER_GEO = new THREE.IcosahedronGeometry(0.5, 1)
+const FILLER_MATS: Record<number, THREE.MeshStandardMaterial> = {}
 
 function cellCenter(c: Cell): THREE.Vector3 {
   return new THREE.Vector3((c.x + 0.5) * CELL, (c.y + 0.5) * CELL, (c.z + 0.5) * CELL)
@@ -128,7 +141,10 @@ export class PackingScene {
     this.renderer.render(this.scene, this.camera)
   }
 
-  sync(state: GameState) {
+  private extras: SceneExtras = {}
+
+  sync(state: GameState, extras: SceneExtras = {}) {
+    this.extras = extras
     this.clearGroup(this.content)
     this.clearGroup(this.overlays)
     if (state.bin.sx !== this.bin.sx || state.bin.sy !== this.bin.sy || state.bin.sz !== this.bin.sz) {
@@ -154,6 +170,8 @@ export class PackingScene {
       }
     }
 
+    if (extras.fillCells?.length && extras.fillColor !== undefined && !extras.lid) this.drawFiller(extras.fillCells, extras.fillColor)
+
     if (state.preview && state.lastResult) {
       const origin = previewOrigin(state)
       if (origin) {
@@ -170,28 +188,36 @@ export class PackingScene {
   }
 
   private drawBin(sx: number, sy: number, sz: number, showGrid: boolean) {
-    const matWall = new THREE.MeshStandardMaterial({ color: 0x4a5568, transparent: true, opacity: 0.35, side: THREE.DoubleSide })
-    const matNear = new THREE.MeshStandardMaterial({ color: 0x88c0d0, transparent: true, opacity: 0.12, side: THREE.DoubleSide })
-    const matFloor = new THREE.MeshStandardMaterial({ color: 0x2e3440, roughness: 0.9 })
-
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(sx * CELL, sz * CELL), matFloor)
-    floor.rotation.x = -Math.PI / 2
-    floor.position.set((sx * CELL) / 2, 0, (sz * CELL) / 2)
-    this.content.add(floor)
-
+    // Table top under the crate
+    const table = new THREE.Mesh(
+      new THREE.BoxGeometry(sx + 3, 0.2, sz + 3),
+      new THREE.MeshStandardMaterial({ color: 0x4a3426, roughness: 0.95 }),
+    )
+    table.position.set(sx / 2, -0.18, sz / 2)
+    this.content.add(table)
+    this.content.add(buildCrate(sx, sy, sz, { lid: this.extras.lid ?? false }))
     if (showGrid) this.drawFloorGrid(sx, sz)
+  }
 
-    const h = sy * CELL
-    const walls: Array<{ w: number; h: number; d: number; x: number; y: number; z: number; near?: boolean }> = [
-      { w: sx * CELL, h, d: 0.06, x: (sx * CELL) / 2, y: h / 2, z: 0.03 }, // back -Z
-      { w: 0.06, h, d: sz * CELL, x: 0.03, y: h / 2, z: (sz * CELL) / 2 }, // left
-      { w: 0.06, h, d: sz * CELL, x: sx * CELL - 0.03, y: h / 2, z: (sz * CELL) / 2 }, // right
-      { w: sx * CELL, h, d: 0.06, x: (sx * CELL) / 2, y: h / 2, z: sz * CELL - 0.03, near: true }, // near +Z transparent
-    ]
-    for (const w of walls) {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w.w, w.h, w.d), w.near ? matNear : matWall)
-      m.position.set(w.x, w.y, w.z)
-      this.content.add(m)
+  /** Filler drawn into the empty cells after sealing. */
+  private drawFiller(cells: Cell[], color: number) {
+    // Loose lumps instead of solid cubes, so the goods stay visible and cell edges don't show.
+    // Positions come from the cell coordinates, so the pile looks the same on every redraw.
+    const geo = FILLER_GEO
+    const mat = (FILLER_MATS[color] ??= new THREE.MeshStandardMaterial({ color, roughness: 1, flatShading: true }))
+    for (const c of cells) {
+      let seed = (c.x * 73856093) ^ (c.y * 19349663) ^ (c.z * 83492791)
+      const rnd = () => ((seed = (seed * 16807 + 12345) & 0x7fffffff) / 0x7fffffff)
+      for (let i = 0; i < 3; i++) {
+        const m = new THREE.Mesh(geo, mat)
+        const s = 0.22 + rnd() * 0.2
+        m.scale.set(s, s * (0.7 + rnd() * 0.4), s)
+        m.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3)
+        // Heavier at the bottom of the cell: filler settles downwards
+        m.position.set((c.x + 0.2 + rnd() * 0.6) * CELL, (c.y + 0.15 + rnd() * 0.4) * CELL, (c.z + 0.2 + rnd() * 0.6) * CELL)
+        m.userData.sharedAsset = true
+        this.content.add(m)
+      }
     }
   }
 
