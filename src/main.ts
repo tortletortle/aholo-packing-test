@@ -33,10 +33,16 @@ function toggleFit() {
   view.sync(state)
   refreshModelUi()
 }
+const btnView = document.querySelector<HTMLButtonElement>('#btn-view')!
+function nextView() {
+  btnView.textContent = `视角：${view.nextView()}（V 切换）`
+}
 btnCells.addEventListener('click', toggleCells)
 btnFit.addEventListener('click', toggleFit)
+btnView.addEventListener('click', nextView)
 window.addEventListener('keydown', (e) => {
   if (e.repeat) return
+  if (e.key === 'v' || e.key === 'V') nextView()
   if (e.key === 'c' || e.key === 'C') toggleCells()
   if (e.key === 'f' || e.key === 'F') toggleFit()
 })
@@ -66,11 +72,12 @@ bindKeyboard(
   },
 )
 
+// Measure the canvas itself (its grid column), not #app — otherwise the image is squashed horizontally
 function layout() {
-  const rect = canvas.parentElement!.getBoundingClientRect()
-  view.resize(rect.width, rect.height)
+  const rect = canvas.getBoundingClientRect()
+  if (rect.width > 0 && rect.height > 0) view.resize(rect.width, rect.height)
 }
-window.addEventListener('resize', layout)
+new ResizeObserver(layout).observe(canvas)
 layout()
 panel.refresh()
 view.sync(state)

@@ -167,3 +167,26 @@ describe('demo layout', () => {
     expect(ys).toContain(1)
   })
 })
+
+describe('preview stays inside the box', () => {
+  it('ignores a move that would push cells outside', () => {
+    let state = createInitialState()
+    state = selectItem(state, state.inventory[0].instanceId) // bar 1×3 at (1,1)
+    for (let i = 0; i < 10; i++) state = movePreview(state, 1, 0)
+    expect(state.preview?.originX).toBe(DEFAULT_BIN.sx - 3)
+    expect(state.lastResult?.ok).toBe(true)
+    for (let i = 0; i < 10; i++) state = movePreview(state, 0, -1)
+    expect(state.preview?.originZ).toBe(0)
+  })
+
+  it('shifts a rotated shape back inside instead of going out of bounds', () => {
+    let state = createInitialState()
+    const book = state.inventory.find((s) => s.shapeId === 'book')!
+    state = selectItem(state, book.instanceId)
+    for (let i = 0; i < 10; i++) state = movePreview(state, 1, 0)
+    for (let t = 0; t < 4; t++) {
+      state = rotatePreview(state)
+      expect(state.lastResult?.code).not.toBe('out_of_bounds')
+    }
+  })
+})

@@ -23,6 +23,13 @@ const COLORS: Record<string, number> = {
   ghost: 0x88aacc,
 }
 
+/** Camera presets; azimuth 0 = straight from the open (+Z) side of the box. */
+const VIEWS = [
+  { label: '斜俯视', elevation: 52, azimuth: 12, zoom: 0.82 },
+  { label: '正俯视', elevation: 88, azimuth: 0, zoom: 0.78 },
+  { label: '低角度', elevation: 28, azimuth: 18, zoom: 0.85 },
+] as const
+
 function cellCenter(c: Cell): THREE.Vector3 {
   return new THREE.Vector3((c.x + 0.5) * CELL, (c.y + 0.5) * CELL, (c.z + 0.5) * CELL)
 }
@@ -53,10 +60,7 @@ export class PackingScene {
     dir.position.set(8, 14, 10)
     this.scene.add(dir)
 
-    this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100)
-    // Fixed oblique top-front view; near wall (+Z) is the open/transparent side
-    this.camera.position.set(5, 9, 11)
-    this.camera.lookAt(3, 0.5, 2)
+    this.camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100)
 
     this.scene.add(this.root)
     this.root.add(this.content)
@@ -67,6 +71,40 @@ export class PackingScene {
     this.renderer.setSize(width, height, false)
     this.camera.aspect = width / height
     this.camera.updateProjectionMatrix()
+    this.frameBin()
+  }
+
+  private bin = { sx: 6, sy: 2, sz: 4 }
+  viewIndex = 0
+
+  /** Cycle camera preset. All presets look from the +Z side so WASD keeps the same screen direction. */
+  nextView(): string {
+    this.viewIndex = (this.viewIndex + 1) % VIEWS.length
+    this.frameBin()
+    return VIEWS[this.viewIndex].label
+  }
+
+  get viewLabel(): string {
+    return VIEWS[this.viewIndex].label
+  }
+
+  /** Point the camera at the box centre and pull back just enough to fit the whole box. */
+  private frameBin() {
+    const { sx, sy, sz } = this.bin
+    const v = VIEWS[this.viewIndex]
+    const target = new THREE.Vector3((sx * CELL) / 2, (sy * CELL) / 3, (sz * CELL) / 2)
+    const radius = Math.hypot(sx, sy, sz) * CELL * 0.5
+    const vFov = THREE.MathUtils.degToRad(this.camera.fov)
+    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect)
+    const dist = (radius / Math.sin(Math.min(vFov, hFov) / 2)) * v.zoom
+    const el = THREE.MathUtils.degToRad(v.elevation)
+    const az = THREE.MathUtils.degToRad(v.azimuth)
+    this.camera.position.set(
+      target.x + dist * Math.cos(el) * Math.sin(az),
+      target.y + dist * Math.sin(el),
+      target.z + dist * Math.cos(el) * Math.cos(az),
+    )
+    this.camera.lookAt(target)
   }
 
   render() {
@@ -76,7 +114,12 @@ export class PackingScene {
   sync(state: GameState) {
     this.clearGroup(this.content)
     this.clearGroup(this.overlays)
-    this.drawBin(state.bin.sx, state.bin.sy, state.bin.sz)
+    if (state.bin.sx !== this.bin.sx || state.bin.sy !== this.bin.sy || state.bin.sz !== this.bin.sz) {
+      this.bin = { ...state.bin }
+      this.frameBin()
+    }
+    // Floor grid only while placing (or when cell lines are switched on)
+    this.drawBin(state.bin.sx, state.bin.sy, state.bin.sz, state.preview !== null || this.options.showCells)
 
     for (const p of state.placements) {
       // While re-editing, still show original solid until confirm — preview drawn separately
@@ -104,7 +147,7 @@ export class PackingScene {
     }
   }
 
-  private drawBin(sx: number, sy: number, sz: number) {
+  private drawBin(sx: number, sy: number, sz: number, showGrid: boolean) {
     const matWall = new THREE.MeshStandardMaterial({ color: 0x4a5568, transparent: true, opacity: 0.35, side: THREE.DoubleSide })
     const matNear = new THREE.MeshStandardMaterial({ color: 0x88c0d0, transparent: true, opacity: 0.12, side: THREE.DoubleSide })
     const matFloor = new THREE.MeshStandardMaterial({ color: 0x2e3440, roughness: 0.9 })
@@ -114,10 +157,7 @@ export class PackingScene {
     floor.position.set((sx * CELL) / 2, 0, (sz * CELL) / 2)
     this.content.add(floor)
 
-    // grid lines on floor
-    const grid = new THREE.GridHelper(Math.max(sx, sz), Math.max(sx, sz), 0x667788, 0x3a4555)
-    grid.position.set((sx * CELL) / 2, 0.01, (sz * CELL) / 2)
-    this.content.add(grid)
+    if (showGrid) this.drawFloorGrid(sx, sz)
 
     const h = sy * CELL
     const walls: Array<{ w: number; h: number; d: number; x: number; y: number; z: number; near?: boolean }> = [
@@ -131,6 +171,16 @@ export class PackingScene {
       m.position.set(w.x, w.y, w.z)
       this.content.add(m)
     }
+  }
+
+  /** Grid lines exactly on the box floor (GridHelper is square and spilled outside a 6×4 box). */
+  private drawFloorGrid(sx: number, sz: number) {
+    const pts: number[] = []
+    for (let x = 0; x <= sx; x++) pts.push(x * CELL, 0.01, 0, x * CELL, 0.01, sz * CELL)
+    for (let z = 0; z <= sz; z++) pts.push(0, 0.01, z * CELL, sx * CELL, 0.01, z * CELL)
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3))
+    this.content.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x667788 })))
   }
 
   /** Draw the shape's real model fitted to its occupied cells. Returns false if no model is loaded. */

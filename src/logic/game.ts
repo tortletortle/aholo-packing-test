@@ -1,5 +1,5 @@
 import { buildOccupancy, DEFAULT_BIN, validatePlacement, withAutoHeight } from './packing'
-import { occupiedCells } from './shapes'
+import { footprintXZ, occupiedCells } from './shapes'
 import type { BinSize, Cell, PlaceResult, Placement, RotTurns, ShapeId } from './types'
 
 export type InventorySlot = {
@@ -132,26 +132,62 @@ export function selectItem(state: GameState, instanceId: string): GameState {
     },
     status: '预览中：WASD 移动 · R 旋转 · Enter 确认 · Esc 取消',
   }
-  return refreshPreview(next)
-}
-
-export function movePreview(state: GameState, dx: number, dz: number): GameState {
-  if (!state.preview) return state
-  const next = {
-    ...state,
-    preview: {
-      ...state.preview,
-      originX: state.preview.originX + dx,
-      originZ: state.preview.originZ + dz,
-    },
+  // Large shapes may not fit at the default spawn; fall back to the first in-bin spot
+  if (!footprintInBin(slot.shapeId, 1, 1, 0, next.bin)) {
+    const spot = firstInBinSpot(slot.shapeId, next.bin)
+    if (spot) next = { ...next, preview: { ...next.preview!, originX: spot.x, originZ: spot.z, rot: spot.rot } }
   }
   return refreshPreview(next)
 }
 
+/** True if every footprint cell lies inside the bin horizontally. */
+export function footprintInBin(shapeId: ShapeId, originX: number, originZ: number, rot: number, bin: BinSize): boolean {
+  return footprintXZ(shapeId, originX, originZ, rot).every((f) => f.x >= 0 && f.z >= 0 && f.x < bin.sx && f.z < bin.sz)
+}
+
+function firstInBinSpot(shapeId: ShapeId, bin: BinSize): { x: number; z: number; rot: RotTurns } | null {
+  for (const rot of [0, 1, 2, 3] as RotTurns[])
+    for (let z = -3; z < bin.sz + 3; z++)
+      for (let x = -3; x < bin.sx + 3; x++) if (footprintInBin(shapeId, x, z, rot, bin)) return { x, z, rot }
+  return null
+}
+
+/** Move one step; a step that would push any cell outside the box is ignored. */
+export function movePreview(state: GameState, dx: number, dz: number): GameState {
+  if (!state.preview) return state
+  const { shapeId, originX, originZ, rot } = state.preview
+  if (!footprintInBin(shapeId, originX + dx, originZ + dz, rot, state.bin)) {
+    return { ...state, status: '已到箱子边缘' }
+  }
+  const next = {
+    ...state,
+    preview: { ...state.preview, originX: originX + dx, originZ: originZ + dz },
+  }
+  return refreshPreview(next)
+}
+
+/**
+ * Rotate 90°. If the rotated shape sticks out, shift it back inside by the smallest offset.
+ * If it cannot fit at all (box too small for that orientation), the rotation is ignored.
+ */
 export function rotatePreview(state: GameState): GameState {
   if (!state.preview) return state
+  const { shapeId, originX, originZ } = state.preview
   const rot = ((state.preview.rot + 1) % 4) as RotTurns
-  return refreshPreview({ ...state, preview: { ...state.preview, rot } })
+  const foot = footprintXZ(shapeId, originX, originZ, rot)
+  const minX = Math.min(...foot.map((f) => f.x))
+  const maxX = Math.max(...foot.map((f) => f.x))
+  const minZ = Math.min(...foot.map((f) => f.z))
+  const maxZ = Math.max(...foot.map((f) => f.z))
+  const shiftX = minX < 0 ? -minX : maxX >= state.bin.sx ? state.bin.sx - 1 - maxX : 0
+  const shiftZ = minZ < 0 ? -minZ : maxZ >= state.bin.sz ? state.bin.sz - 1 - maxZ : 0
+  if (!footprintInBin(shapeId, originX + shiftX, originZ + shiftZ, rot, state.bin)) {
+    return { ...state, status: '箱内空间不够这个朝向，未旋转' }
+  }
+  return refreshPreview({
+    ...state,
+    preview: { ...state.preview, rot, originX: originX + shiftX, originZ: originZ + shiftZ },
+  })
 }
 
 export function confirmPreview(state: GameState): GameState {
