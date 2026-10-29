@@ -25,9 +25,10 @@ const COLORS: Record<string, number> = {
 
 /** Camera presets; azimuth 0 = straight from the open (+Z) side of the box. */
 const VIEWS = [
-  { label: '斜俯视', elevation: 52, azimuth: 12, zoom: 0.82 },
-  { label: '正俯视', elevation: 88, azimuth: 0, zoom: 0.78 },
-  { label: '低角度', elevation: 28, azimuth: 18, zoom: 0.85 },
+  // fill = how much of the frame (NDC, 1 = edge) the box may use
+  { label: '斜俯视', elevation: 52, azimuth: 12, fill: 0.8 },
+  { label: '正俯视', elevation: 88, azimuth: 0, fill: 0.8 },
+  { label: '低角度', elevation: 28, azimuth: 18, fill: 0.8 },
 ] as const
 
 function cellCenter(c: Cell): THREE.Vector3 {
@@ -93,18 +94,34 @@ export class PackingScene {
     const { sx, sy, sz } = this.bin
     const v = VIEWS[this.viewIndex]
     const target = new THREE.Vector3((sx * CELL) / 2, (sy * CELL) / 3, (sz * CELL) / 2)
-    const radius = Math.hypot(sx, sy, sz) * CELL * 0.5
-    const vFov = THREE.MathUtils.degToRad(this.camera.fov)
-    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect)
-    const dist = (radius / Math.sin(Math.min(vFov, hFov) / 2)) * v.zoom
     const el = THREE.MathUtils.degToRad(v.elevation)
     const az = THREE.MathUtils.degToRad(v.azimuth)
-    this.camera.position.set(
-      target.x + dist * Math.cos(el) * Math.sin(az),
-      target.y + dist * Math.sin(el),
-      target.z + dist * Math.cos(el) * Math.cos(az),
-    )
-    this.camera.lookAt(target)
+    const dir = new THREE.Vector3(Math.cos(el) * Math.sin(az), Math.sin(el), Math.cos(el) * Math.cos(az))
+    const corners: THREE.Vector3[] = []
+    for (const x of [0, sx]) for (const y of [0, sy]) for (const z of [0, sz]) corners.push(new THREE.Vector3(x, y, z).multiplyScalar(CELL))
+    const place = (d: number) => {
+      this.camera.position.copy(target).addScaledVector(dir, d)
+      this.camera.lookAt(target)
+      this.camera.updateMatrixWorld()
+    }
+    // Closest distance at which every box corner stays inside the frame (with margin)
+    const limit = v.fill
+    const fits = (d: number) => {
+      place(d)
+      return corners.every((c) => {
+        const p = c.clone().project(this.camera)
+        return Math.abs(p.x) <= limit && Math.abs(p.y) <= limit
+      })
+    }
+    // Search well inside the camera's far plane (100), otherwise the box gets clipped away
+    let lo = 0.5
+    let hi = 60
+    for (let i = 0; i < 30; i++) {
+      const mid = (lo + hi) / 2
+      if (fits(mid)) hi = mid
+      else lo = mid
+    }
+    place(hi)
   }
 
   render() {

@@ -60,6 +60,43 @@ export function createInitialState(): GameState {
   }
 }
 
+/** Packing state for an order: given box size and item list, nothing placed yet. */
+export function createPackingState(bin: BinSize, items: readonly ShapeId[]): GameState {
+  return {
+    bin: { ...bin },
+    inventory: items.map((shapeId) => ({ instanceId: nid(shapeId), shapeId, placed: false })),
+    placements: [],
+    preview: null,
+    status: '点击左侧货物开始装箱',
+    lastResult: null,
+  }
+}
+
+/**
+ * Change box size, keeping every placement that is still legal in the new box
+ * (checked bottom-up so stacked items keep their support). The rest go back to the list.
+ */
+export function changeBin(state: GameState, bin: BinSize): GameState {
+  const base = cancelPreview(state)
+  const kept: Placement[] = []
+  const occ = buildOccupancy([])
+  for (const p of [...base.placements].sort((a, b) => a.origin.y - b.origin.y)) {
+    if (validatePlacement(p.shapeId, p.origin, p.rot, bin, occ).ok) {
+      kept.push(p)
+      for (const c of occupiedCells(p.shapeId, p.origin, p.rot)) occ.set(`${c.x},${c.y},${c.z}`, p.id)
+    }
+  }
+  const keptIds = new Set(kept.map((p) => p.id))
+  const returned = base.placements.length - kept.length
+  return {
+    ...base,
+    bin: { ...bin },
+    placements: kept,
+    inventory: base.inventory.map((s) => ({ ...s, placed: keptIds.has(s.instanceId) })),
+    status: returned ? `已换箱：${returned} 件放不下，已退回货物列表` : '已换箱，原布局全部保留',
+  }
+}
+
 function occupancyExcludingPreview(state: GameState) {
   const exclude = state.preview?.restore?.id
   return buildOccupancy(state.placements, exclude)
