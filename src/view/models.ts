@@ -34,7 +34,7 @@ export type ModelTemplate = {
   readonly loadMs: number
 }
 
-export type ModelStatus = { state: 'loading' | 'ok' | 'error'; text: string }
+export type ModelStatus = { state: 'loading' | 'ok' | 'error'; text: string; loaded: number; total: number }
 
 const templates = new Map<ShapeId, ModelTemplate>()
 
@@ -45,10 +45,12 @@ export function getTemplate(shapeId: ShapeId): ModelTemplate | undefined {
 export async function loadModels(onStatus: (s: ModelStatus) => void): Promise<void> {
   const loader = new GLTFLoader()
   const entries = Object.entries(MODEL_URLS) as Array<[ShapeId, string]>
-  onStatus({ state: 'loading', text: `模型加载中（${entries.length} 个）…` })
+  const total = entries.length
+  onStatus({ state: 'loading', text: `模型加载中（${total} 个）…`, loaded: 0, total })
   const lines: string[] = []
   let failed = false
-  for (const [shapeId, url] of entries) {
+  for (const [i, [shapeId, url]] of entries.entries()) {
+    if (i > 0) onStatus({ state: 'loading', text: `模型加载中 ${i}/${total}…`, loaded: i, total })
     const t0 = performance.now()
     try {
       const gltf = await loader.loadAsync(url)
@@ -70,7 +72,7 @@ export async function loadModels(onStatus: (s: ModelStatus) => void): Promise<vo
       lines.push(`${shapeId}：加载失败，改用方块显示`)
     }
   }
-  onStatus({ state: failed ? 'error' : 'ok', text: lines.join('\n') })
+  onStatus({ state: failed ? 'error' : 'ok', text: lines.join('\n'), loaded: total, total })
 }
 
 /**

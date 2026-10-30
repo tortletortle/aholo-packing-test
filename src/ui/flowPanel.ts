@@ -12,6 +12,7 @@ export type FlowActions = {
   seal: () => void
   chooseFiller: (fillerId: FillerId) => void
   ship: () => void
+  nextOrder: () => void
   restart: () => void
 }
 
@@ -47,6 +48,7 @@ export function mountFlowPanel(getFlow: () => FlowState, actions: FlowActions): 
     if (act === 'filler' && el.dataset.filler) actions.chooseFiller(el.dataset.filler as FillerId)
     if (act === 'ship') actions.ship()
     if (act === 'restart') actions.restart()
+    if (act === 'next') actions.nextOrder()
   })
 
   const refresh = () => {
@@ -127,8 +129,9 @@ export function mountFlowPanel(getFlow: () => FlowState, actions: FlowActions): 
         <div class="row"><span>金币</span><span>${s.goldBefore} → ${s.goldAfter}</span></div>
       </div>
       <p class="hint">${s.boxId === 'small' ? '用小箱装下了，空隙少，省钱也更稳。' : '大箱空隙多，晃动风险高。试试用小箱装下。'}</p>
-      <p class="hint">第二单、第三单还没做，目前只能重新开始。</p>
-      <button type="button" class="flow-btn primary" data-act="restart">重新开始</button>`
+      <p class="hint">第二单、第三单还没做，下一单暂时还是这一单，金币会保留。</p>
+      <button type="button" class="flow-btn primary" data-act="next">接下一单</button>
+      <button type="button" class="flow-btn subtle" data-act="restart">从头开始（金币重置为初始值）</button>`
   }
 
   return { refresh }

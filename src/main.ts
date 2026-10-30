@@ -10,6 +10,11 @@ import { mountPanel } from './ui/panel'
 import { mountFlowPanel } from './ui/flowPanel'
 import { PackingScene } from './view/scene'
 import { FIT_LABELS, loadModels, type FitMode } from './view/models'
+import { nextOrder } from './logic/flow'
+import { bindNavigation, currentScreen, go, onScreenChange } from './ui/screens'
+import { ShowcaseScene } from './view/showcase'
+import { CATALOG } from './logic/catalog'
+import { ACHIEVEMENTS, loadUnlocked, unlockFrom } from './logic/achievements'
 
 // ?mode=sandbox keeps the original test bench (all shapes, demo layouts); default is the order flow
 const SANDBOX = new URLSearchParams(location.search).get('mode') === 'sandbox'
@@ -86,7 +91,13 @@ const flowPanel = mountFlowPanel(() => flow, {
   switchBox: (boxId) => setFlow(switchBox(flow, boxId)),
   seal: () => setFlow(seal(flow)),
   chooseFiller: (id) => setFlow(chooseFiller(flow, id)),
-  ship: () => setFlow(ship(flow)),
+  ship: () => {
+    setFlow(ship(flow))
+    const fresh = flow.settlement ? unlockFrom(flow.settlement, unlocked) : []
+    if (fresh.length) toast(`解锁成就：${fresh.map((a) => a.name).join('、')}`)
+    refreshHub()
+  },
+  nextOrder: () => setFlow(nextOrder(flow)),
   restart: () => setFlow(createFlow()),
 })
 
@@ -116,22 +127,134 @@ function render() {
   refreshModelUi()
 }
 
-void loadModels((s) => {
-  loadText = s.state === 'error' ? s.text : s.state === 'loading' ? s.text : ''
-  render()
+// ---------- achievements + toast ----------
+const unlocked = loadUnlocked()
+const toastEl = document.querySelector<HTMLElement>('#toast')!
+let toastTimer = 0
+function toast(text: string) {
+  toastEl.textContent = text
+  toastEl.hidden = false
+  window.clearTimeout(toastTimer)
+  toastTimer = window.setTimeout(() => (toastEl.hidden = true), 3200)
+}
+function refreshWall() {
+  document.querySelector('#wall-list')!.innerHTML = ACHIEVEMENTS.map((a) => {
+    const got = unlocked.has(a.id)
+    return `<li class="${got ? '' : 'locked'}"><span class="medal">${got ? '🏅' : '🔒'}</span><div><b>${a.name}</b><div class="hint">${a.condition}</div></div></li>`
+  }).join('')
+}
+function refreshHub() {
+  document.querySelector('#hub-gold')!.textContent = `金币：${flow.gold} · 成就 ${unlocked.size}/${ACHIEVEMENTS.length}`
+}
+
+// ---------- showcase ----------
+const scCanvas = document.querySelector<HTMLCanvasElement>('#sc')!
+const showcase = new ShowcaseScene(scCanvas)
+const scCard = document.querySelector<HTMLElement>('#sc-card')!
+const scHint = document.querySelector<HTMLElement>('#sc-hint')!
+const scBack = document.querySelector<HTMLButtonElement>('#sc-back')!
+let closeUpOpen = false
+
+function itemCard(id: keyof typeof CATALOG, extra = '') {
+  const c = CATALOG[id]
+  if (!c) return ''
+  return `<h2>${c.name}</h2><div class="hint">${c.origin} · 估价 ${c.value} 金币</div><p>${c.description}</p>${extra}`
+}
+showcase.onHover = (id) => {
+  if (closeUpOpen) return
+  scCard.hidden = !id
+  if (id) scCard.innerHTML = itemCard(id, '<div class="hint">点击仔细看看</div>')
+}
+showcase.onPick = async (id) => {
+  closeUpOpen = true
+  scHint.textContent = '高清模型加载中…'
+  scBack.textContent = '← 回展示柜'
+  scCard.hidden = false
+  scCard.innerHTML = itemCard(id)
+  const source = await showcase.openCloseUp(id)
+  if (!closeUpOpen) return
+  scHint.textContent = source === 'hd' ? '拖动旋转 · 滚轮缩放（高清模型）' : '高清模型加载失败，显示的是普通模型'
+}
+scCanvas.addEventListener('pointerdown', () => closeUpOpen && showcase.pauseAutoRotate())
+scBack.addEventListener('click', () => {
+  if (closeUpOpen) {
+    closeUpOpen = false
+    showcase.closeCloseUp()
+    scCard.hidden = true
+    scHint.textContent = '点击柜子里的物品仔细看看'
+    scBack.textContent = '← 回柜台'
+  } else {
+    go('hub')
+  }
 })
 
-// Measure the canvas itself (its grid column), not #app — otherwise the image is squashed horizontally
-function layout() {
-  const rect = canvas.getBoundingClientRect()
-  if (rect.width > 0 && rect.height > 0) view.resize(rect.width, rect.height)
+// ---------- screens ----------
+bindNavigation()
+onScreenChange((id) => {
+  if (id === 'hub') refreshHub()
+  if (id === 'wall') refreshWall()
+  if (id === 'packing') render()
+})
+
+// Measure each canvas itself, not its container — otherwise the image is squashed horizontally
+function fit(c: HTMLCanvasElement, resize: (w: number, h: number) => void) {
+  const apply = () => {
+    const r = c.getBoundingClientRect()
+    if (r.width > 0 && r.height > 0) resize(r.width, r.height)
+  }
+  new ResizeObserver(apply).observe(c)
+  apply()
 }
-new ResizeObserver(layout).observe(canvas)
-layout()
+fit(canvas, (w, h) => view.resize(w, h))
+fit(scCanvas, (w, h) => showcase.resize(w, h))
+
+// ---------- loading ----------
+// Images and the shelf models must be ready before the counter appears. HD models load on demand.
+const loadBar = document.querySelector<HTMLElement>('#load-bar')!
+const loadTextEl = document.querySelector<HTMLElement>('#load-text')!
+const IMAGES = ['/images/shop.jpg', '/images/workbench.jpg']
+let imagesDone = 0
+let modelsDone = 0
+let modelsTotal = 4
+function progress() {
+  const done = imagesDone + modelsDone
+  const total = IMAGES.length + modelsTotal
+  loadBar.style.width = `${Math.round((done / total) * 100)}%`
+  loadTextEl.textContent = `${done} / ${total}`
+}
+const imagesReady = Promise.all(
+  IMAGES.map(
+    (src) =>
+      new Promise<void>((resolve) => {
+        const img = new Image()
+        img.onload = img.onerror = () => {
+          imagesDone++
+          progress()
+          resolve()
+        }
+        img.src = src
+      }),
+  ),
+)
+const modelsReady = loadModels((s) => {
+  modelsTotal = s.total
+  modelsDone = s.loaded
+  loadText = s.state === 'error' ? s.text : ''
+  progress()
+})
+progress()
 render()
 
+void Promise.all([imagesReady, modelsReady]).then(() => {
+  showcase.build()
+  render()
+  go(SANDBOX ? 'packing' : 'hub')
+})
+
 function loop() {
-  view.render()
+  const s = currentScreen()
+  if (s === 'packing') view.render()
+  else if (s === 'showcase') showcase.render()
   requestAnimationFrame(loop)
 }
 loop()

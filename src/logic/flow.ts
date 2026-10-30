@@ -134,4 +134,14 @@ export function ship(flow: FlowState, roll: () => number = Math.random): FlowSta
   return { ...flow, phase: 'settled', gold: settlement.goldAfter, settlement }
 }
 
+/** After settling: take the next order, keeping the gold earned so far. Orders loop for now. */
+export function nextOrder(flow: FlowState): FlowState {
+  if (flow.phase !== 'settled') return flow
+  return {
+    ...createFlow(),
+    gold: flow.gold,
+    orderIndex: (flow.orderIndex + 1) % ORDERS.length,
+  }
+}
+
 export { FILLERS }

@@ -41,6 +41,13 @@ const VIEWS = [
   { label: '低角度', elevation: 28, azimuth: 18, fill: 0.8 },
 ] as const
 
+// Workbench materials are shared and never disposed (the texture loads once)
+const tableTex = new THREE.TextureLoader().load('/images/workbench.jpg')
+tableTex.colorSpace = THREE.SRGBColorSpace
+tableTex.anisotropy = 8
+const TABLE_TOP = new THREE.MeshStandardMaterial({ map: tableTex, roughness: 0.9 })
+const TABLE_EDGE = new THREE.MeshStandardMaterial({ color: 0x3a2618, roughness: 0.95 })
+
 // Filler lumps share one geometry and one material per colour (never disposed, reused every redraw)
 const FILLER_GEO = new THREE.IcosahedronGeometry(0.5, 1)
 const FILLER_MATS: Record<number, THREE.MeshStandardMaterial> = {}
@@ -232,11 +239,17 @@ export class PackingScene {
   }
 
   private drawBin(sx: number, sy: number, sz: number, showGrid: boolean) {
-    // Table top under the crate
-    const table = new THREE.Mesh(
-      new THREE.BoxGeometry(sx + 3, 0.2, sz + 3),
-      new THREE.MeshStandardMaterial({ color: 0x4a3426, roughness: 0.95 }),
-    )
+    // Workbench under the crate: generated top-down texture on a thin slab (no modelling needed)
+    const side = Math.max(sx, sz) + 4
+    const table = new THREE.Mesh(new THREE.BoxGeometry(side, 0.2, side), [
+      TABLE_EDGE,
+      TABLE_EDGE,
+      TABLE_TOP,
+      TABLE_EDGE,
+      TABLE_EDGE,
+      TABLE_EDGE,
+    ])
+    table.userData.sharedAsset = true
     table.position.set(sx / 2, -0.18, sz / 2)
     this.content.add(table)
     this.content.add(buildCrate(sx, sy, sz, { lid: this.extras.lid ?? false }))

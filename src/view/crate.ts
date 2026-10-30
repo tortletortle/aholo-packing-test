@@ -8,8 +8,8 @@ import * as THREE from 'three'
 
 let woodTex: THREE.CanvasTexture | null = null
 
-/** Simple generated wood grain, shared by all crates. */
-function woodTexture(): THREE.CanvasTexture {
+/** Simple generated wood grain, shared by all crates and the showcase cabinet. */
+export function woodTexture(): THREE.CanvasTexture {
   if (woodTex) return woodTex
   const w = 256
   const h = 64

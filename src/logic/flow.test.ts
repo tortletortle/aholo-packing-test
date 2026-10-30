@@ -114,3 +114,15 @@ describe('order 1 flow', () => {
     expect(flow.packing!.placements).toHaveLength(1)
   })
 })
+
+describe('next order', () => {
+  it('keeps gold and returns to the order phase', async () => {
+    const { nextOrder } = await import('./flow')
+    const done = ship(seal(packOrder1Small(startPacking(createFlow(), 'small'))), SAFE)
+    const next = nextOrder(done)
+    expect(next.phase).toBe('order')
+    expect(next.gold).toBe(done.gold)
+    expect(next.settlement).toBeNull()
+    expect(nextOrder(next)).toBe(next)
+  })
+})

@@ -6,10 +6,44 @@
     <title>奇货寄运铺</title>
   </head>
   <body>
-    <div id="app">
+    <!-- loading -->
+    <div id="loading" class="screen">
+      <div class="loading-box">
+        <h1>奇货寄运铺</h1>
+        <p class="loading-sub">正在把货物搬上货架…</p>
+        <div class="bar"><div id="load-bar"></div></div>
+        <div id="load-text" class="hint"></div>
+      </div>
+    </div>
+
+    <!-- shop counter (static image + hotspots) -->
+    <div id="hub" class="screen" hidden>
+      <div class="hub-stage">
+        <button type="button" class="hotspot" data-go="showcase" style="left: 0%; top: 4%; width: 33%; height: 64%">
+          <span>展示柜</span>
+        </button>
+        <button type="button" class="hotspot" data-go="wall" style="left: 32%; top: 9%; width: 32%; height: 34%">
+          <span>成就墙</span>
+        </button>
+        <button type="button" class="hotspot" data-go="market" style="left: 51%; top: 45%; width: 13%; height: 23%">
+          <span>黑市小门</span>
+        </button>
+        <button type="button" class="hotspot" data-go="packing" style="left: 64%; top: 9%; width: 36%; height: 61%">
+          <span>打包室</span>
+        </button>
+        <div class="hub-hud">
+          <div id="hub-gold" class="gold"></div>
+          <div class="hint">点击店里的地方进入。</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- packing room -->
+    <div id="app" hidden>
       <canvas id="c"></canvas>
       <aside id="panel">
-        <h1 id="title">奇货寄运铺</h1>
+        <button type="button" class="back-btn" data-go="hub">← 回柜台</button>
+        <h1 id="title">打包室</h1>
         <div id="gold" class="gold"></div>
 
         <!-- order flow (default mode) -->
@@ -41,6 +75,38 @@
         <div id="model-status" class="hint"></div>
       </aside>
     </div>
+
+    <!-- showcase cabinet -->
+    <div id="showcase" class="screen" hidden>
+      <canvas id="sc"></canvas>
+      <div class="sc-top">
+        <button type="button" class="back-btn" id="sc-back">← 回柜台</button>
+        <div id="sc-hint" class="sc-hint">点击柜子里的物品仔细看看</div>
+      </div>
+      <div id="sc-card" class="sc-card" hidden></div>
+    </div>
+
+    <!-- black market (placeholder) -->
+    <div id="market" class="screen modal" hidden>
+      <div class="modal-box">
+        <h2>桌下的小门</h2>
+        <p>门缝里透出绿光，里面传来矮人压低的嗓音：</p>
+        <p class="quote">“好货我都收，按六成算。现在嘛……你手上还没有值得我出价的东西。”</p>
+        <p class="hint">黑市交易会在第三单开放：客人的贵重藏品可以卖给矮人，也可以偷偷留进展示柜。</p>
+        <button type="button" class="flow-btn primary" data-go="hub">回柜台</button>
+      </div>
+    </div>
+
+    <!-- achievement wall -->
+    <div id="wall" class="screen modal" hidden>
+      <div class="modal-box">
+        <h2>成就墙</h2>
+        <ul id="wall-list" class="wall-list"></ul>
+        <button type="button" class="flow-btn primary" data-go="hub">回柜台</button>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
